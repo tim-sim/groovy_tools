@@ -17,9 +17,36 @@ final TEST_WORKSPACE = "\\PREMIER_CLAIM_AU_1.0_claimsEvaluation"
 
 //extractWorkspaceRules(PRODUCT_LOCATION + TEST_WORKSPACE + "\\Rules").each { println it }
 
-extractComponentRules(PRODUCT_LOCATION + TEST_WORKSPACE + "\\Rules\\ruleSet_v1\\ruleSet.xml").each { println it}
+//extractComponentRules(PRODUCT_LOCATION + TEST_WORKSPACE + "\\Rules\\ruleSet_v1\\ruleSet.xml").each { println it}
 
-def parseCommandLine() {
+parseCommandLine(args)
+
+def parseCommandLine(args) {
+    def cli = new CliBuilder(usage: 'blshelper -[fght] [product_dir]', header: 'Options:') 
+    cli.with {
+        h longOpt: 'help', 'Show usage information'
+        f longOpt: 'fix', 'Try to fix BLS errors'
+        g longOpt: 'generate', 'Re-generate rule set files'
+        t longOpt: 'test', 'Check BLS rules for consistency'
+    }
+    def options = cli.parse(args)
+    if (!options) {
+        println 'Unknown error' 
+    } else if (options.h) {
+        println cli.usage() 
+    } else if (options.t) {
+        println 'Testing..'
+        def productDir = '.'
+        def product = new Product(root: productDir)
+        product.test()
+        if (!product.errors) {
+            product.errors.each { println it }
+        } else {
+            println 'OK'
+        }
+    } else {
+        println cli.usage()
+    }
 }
 
 def extractWorkspaceRules(workspace) {
@@ -43,13 +70,30 @@ class Product {
     def REGEX_RULE_FILE = /.*rules\.xml/
     def PATH_RULES = "\\Rules\\ruleSet_v1"
     def FILE_RULESET = "\\ruleSet.xml"
+    def WORKSPACE_LIST = ['claimsEvaluation', 'claimsSummaryInfo']
 
     def root
-    def code
-    def version = "1.0"
-    def workspaces
+    def errors = []
 
-    def testRules() {
+    def test() {
+        getRuleDirs().each {
+            def ruleset = extractRules(it + FILE_RULESET)
+            def rules = extractComponentRules(it)
+            compareRules(ruleset, rules)
+        }
+    }
+    
+    def compareRules(ruleSet, rules) {
+        ruleSet.each {
+            if (!rules.contains(it)) {
+                errors << 'Component rule is not exist in ruleset: ' + it 
+            }
+        }
+        rules.each {
+            if (!ruleSet.contains(it)) {
+                errors << 'Ruleset contains non-existent rule: ' + it
+            }
+        }
     }
 
     def generateRuleSet() {
@@ -58,7 +102,10 @@ class Product {
     def fixRuleSet() {
     }
 
-    def listWorkspaces() {
+    def getRuleDirs() {
+        def dirs = []
+        new File(root).eachDir { dirs << root + "\\" + it.name + PATH_RULES }
+        dirs
     }
 
     def extractRules(file) {
