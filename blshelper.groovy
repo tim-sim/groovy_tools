@@ -1,4 +1,5 @@
 import groovy.io.FileType
+import groovy.xml.MarkupBuilder
 
 parseCommandLine(args)
 
@@ -15,17 +16,21 @@ def parseCommandLine(args) {
         print 'Unknown error' 
     } else if (options.h) {
         println cli.usage() 
+    } else if (options.g) {
+        println 'Generating..'
+        def productDir = '.'
+        new Product(root: productDir).generate()
     } else if (options.t) {
-        println 'Testing.. '
+        println 'Testing..'
         def productDir = '.'
         def product = new Product(root: productDir)
         product.test()
-        if (!product.errors) {
+        if (product.errors.size() != 0) {
             println 'FAILED'
             product.errors.each { println it }
         } else {
             println 'OK'
-        }
+        } 
     } else {
         println cli.usage()
     }
@@ -36,18 +41,17 @@ class Product {
     def REGEX_RULE_FILE = /.*rules\.xml/
     def PATH_RULES = "\\Rules\\ruleSet_v1"
     def FILE_RULESET = "\\ruleSet.xml"
-    def WORKSPACE_LIST = ['claimsEvaluation', 'claimsSummaryInfo']
 
-    def logging = false
+    def logging = false 
     def root
     def errors = []
 
     def test() {
         log 'Called test()'
         getRuleDirs().each {
-            def ruleset = extractRules(new File(it + FILE_RULESET))
+            def ruleSet = extractRules(new File(it + FILE_RULESET))
             def rules = extractComponentRules(new File(it))
-            compareRules(ruleset, rules)
+            compareRules(ruleSet, rules)
         }
     }
     
@@ -65,10 +69,17 @@ class Product {
         }
     }
 
-    def generateRuleSet() {
+    def generate() {
+        getRuleDirs().each {
+            def rules = extractComponentRules(new File(it))
+            def builder = new MarkupBuilder(new FileWriter(it + FILE_RULESET + '.new'))
+            builder.ruleSetDTO() {
+                rules.each { businessRulesUUIDs(it) }
+            }
+        }
     }
 
-    def fixRuleSet() {
+    def fix() {
     }
 
     def getRuleDirs() {
@@ -91,7 +102,7 @@ class Product {
         log "Called extractComponentRules($dir)"
         def rules = []
         dir.eachFileRecurse(FileType.FILES) {
-            if (it =~ REGEX_RULE_FILE) { rules << extractRules(it) } 
+            if (it =~ REGEX_RULE_FILE) { rules += extractRules(it) } 
         }
         log rules
         rules
