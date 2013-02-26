@@ -42,33 +42,44 @@ class Product {
     def PATH_RULES = "\\Rules\\ruleSet_v1"
     def FILE_RULESET = "\\ruleSet.xml"
 
-    def logging = false 
+    def logging = false
     def root
     def errors = []
 
     def test() {
         log 'Called test()'
+        def ruleSet = []
+        def rules = []
         getRuleDirs().each {
-            def ruleSet = extractRules(new File(it + FILE_RULESET))
-            def rules = extractComponentRules(new File(it))
-            compareRules(ruleSet, rules)
+            ruleSet += extractRules(new File(it + FILE_RULESET))
+            rules += extractComponentRules(new File(it))
         }
+        compareRules(ruleSet, rules)
+        checkDuplicates(ruleSet)
+        checkDuplicates(rules)
     }
     
     def compareRules(ruleSet, rules) {
         log 'Called compareRules()'
-        ruleSet.each {
-            if (!rules.contains(it)) {
-                errors << 'Component rule is not exist in ruleset: ' + it 
-            }
-        }
-        rules.each {
-            if (!ruleSet.contains(it)) {
-                errors << 'Ruleset contains non-existent rule: ' + it
-            }
-        }
+        def tmp = []
+        tmp.addAll(ruleSet) 
+        tmp.removeAll(rules)
+        tmp.each { errors << "Ruleset contains non-existent rule: $it" }
+        tmp = []
+        tmp.addAll(rules) 
+        tmp.removeAll(ruleSet)
+        tmp.each { errors << "Component rule is not exist in ruleset: $it" }
     }
 
+    def checkDuplicates(list) {
+        log 'Called checkDuplicates()'
+        def dups = []
+        dups.addAll(list)
+        dups.retainAll { dups.count(it) > 1 }
+        dups.unique()
+        dups.each { errors << "Duplicate rule: $it" }
+    }
+    
     def generate() {
         getRuleDirs().each {
             def rules = extractComponentRules(new File(it))
